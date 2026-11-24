@@ -12,6 +12,7 @@ data/user.txt
 # VS 构建目录与用户文件
 bin/
 obj/
+dist/
 .vs/
 *.user
 *.suo

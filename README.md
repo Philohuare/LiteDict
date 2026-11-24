@@ -7,9 +7,15 @@
 双击即用。界面全部 GDI 自绘，跟随系统深浅色。
 
 > ### 只想用，不想编译
-> 到 [**Releases**](https://github.com/Philohuare/LiteDict/releases/latest) 下载
-> `LiteDict-*-win64.zip`，解压后双击 `LiteDict.exe` 就行 —— exe 和 77 万词条的词库都在包里，
-> 不用装 VS，不用联网。绿色版，删文件夹即卸载。
+>
+> | 想做的事 | 下载 |
+> |---|---|
+> | 直接用（exe + 77 万词条词库） | [**LiteDict-v1.0.0-win64.zip**](https://github.com/Philohuare/LiteDict/releases/latest/download/LiteDict-v1.0.0-win64.zip) · 84 MB |
+> | 只更新程序（配已有词库） | [LiteDict.exe](https://github.com/Philohuare/LiteDict/releases/latest/download/LiteDict.exe) · 220 KB |
+> | 只要词库 | [dict.ldict](https://github.com/Philohuare/LiteDict/releases/latest/download/dict.ldict) · 84 MB |
+>
+> 第一种解压后双击 `LiteDict.exe` 即可 —— 绿色版，不装 VS、不联网，删文件夹即卸载。
+> 第二种记得把 `dict.ldict` 放进 exe 同级的 `data\` 目录。
 
 ---
 

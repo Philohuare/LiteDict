@@ -57,6 +57,13 @@ jobs:
         with:
           files: dist/LiteDict.exe
           body: |
-            下载 `LiteDict.exe`，与词典数据 `data/dict.ldict` 放在同一目录即可运行。
+            ## 下载
 
-            词库（84 MB）不随仓库分发，见 README 的「词库格式 → 要重建」。
+            - **`LiteDict.exe`**（本 Release 附件，220 KB）—— 程序本体
+            - **词库**：从 [v1.0.0](https://github.com/Philohuare/LiteDict/releases/tag/v1.0.0)
+              下载 `dict.ldict`，或者直接下那边的一体包 `LiteDict-v1.0.0-win64.zip`
+
+            用法：把 `dict.ldict` 放到 `LiteDict.exe` 同级的 `data\` 目录，双击运行。
+            绿色版，不写注册表、删文件夹即卸载。
+
+            `LiteDict.exe` 由 GitHub Actions 在本 tag 的源码上现场编译（Release / x64）。
