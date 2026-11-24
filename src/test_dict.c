@@ -37,6 +37,29 @@ int main(void) {
     show("so");
     show("zzzzqqq");
 
+
+    printf("\n--- 汉译英 ---\n");
+    printf("中文索引 %d 词\n", dict_zh_count());
+    static const char *zh[] = { "学习", "苹果", "爱情", "时间", "放弃",
+                                "美丽的", "研究", "宇宙", "不存在的词" };
+    for (int i = 0; i < 9; i++) {
+        char key[128];
+        int kn = dict_zh_norm(zh[i], (int)strlen(zh[i]), key, sizeof(key));
+        int ids[8];
+        int m = dict_zh_find(key, kn, ids, 6);
+        printf("%-10s -> %d 个:", zh[i], m);
+        for (int j = 0; j < m; j++)
+            printf(" %s", dict_entry(ids[j])->word);
+        if (!m) {
+            int p2 = dict_zh_prefix(key, kn, ids, 6);
+            printf(" (前缀 %d:", p2);
+            for (int j = 0; j < p2; j++)
+                printf(" %s", dict_entry(ids[j])->word);
+            printf(")");
+        }
+        printf("\n");
+    }
+
     printf("\n--- 前缀 stud ---\n");
     int out[12];
     int n = dict_prefix("stud", 4, out, 8, 1);

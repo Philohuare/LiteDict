@@ -15,10 +15,15 @@ typedef struct {
     uint32_t off, len, base;
 } RawVar;
 
+/* 中文反向索引目录项：term 串在字符串池里 */
+typedef struct {
+    uint32_t off, len, poff, cnt;
+} RawZh;
+
 typedef struct {
     char magic[8];
     uint32_t version, n_entries, off_entries, n_vars, off_vars, off_strings;
-    uint32_t strings_bytes, reserved;
+    uint32_t strings_bytes, reserved;   /* reserved: 版本 2 起 = zh 段偏移 */
 } RawHeader;
 #pragma pack(pop)
 
@@ -30,6 +35,9 @@ static const RawHeader *g_hdr = NULL;
 static const RawEntry *g_ent = NULL;
 static const RawVar *g_var = NULL;
 static const char *g_str = NULL;
+static const RawZh *g_zh = NULL;
+static const uint32_t *g_zhpost = NULL;
+static uint32_t g_nzh = 0;
 
 static int try_path(const char *path) {
     HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
@@ -60,6 +68,23 @@ static int try_path(const char *path) {
     g_ent = (const RawEntry *)(b + h->off_entries);
     g_var = (const RawVar *)(b + h->off_vars);
     g_str = (const char *)(b + h->off_strings);
+
+    /* 版本 2 起多一段中文反向索引；老词库照常能用，只是没有汉译英 */
+    g_zh = NULL;
+    g_zhpost = NULL;
+    g_nzh = 0;
+    if (h->version >= 2 && h->reserved) {
+        size_t at = (size_t)h->reserved;
+        if (at + 4 <= g_size) {
+            uint32_t n = *(const uint32_t *)(b + at);
+            size_t dir = (size_t)n * 16;
+            if (at + 4 + dir <= g_size) {
+                g_nzh = n;
+                g_zh = (const RawZh *)(b + at + 4);
+                g_zhpost = (const uint32_t *)(b + at + 4 + dir);
+            }
+        }
+    }
     return 1;
 }
 
@@ -171,8 +196,91 @@ int dict_var_base(const char *wl, int len) {
     return -1;
 }
 
-static int freq_bucket(uint32_t frq) {
-    if (frq == 0) return 4;
+/* ------------------------------------------------------------ 汉译英 */
+
+int dict_zh_count(void) { return (int)g_nzh; }
+
+static int cmp_zh(int i, const char *key, int klen) {
+    const RawZh *z = &g_zh[i];
+    int elen = (int)z->len;
+    int n = (klen < elen) ? klen : elen;
+    int c = memcmp(g_str + z->off, key, (size_t)n);
+    if (c) return c;
+    if (elen < klen) return -1;
+    if (elen > klen) return 1;
+    return 0;
+}
+
+static int zh_lower_bound(const char *key, int klen) {
+    int lo = 0, hi = (int)g_nzh;
+    while (lo < hi) {
+        int mid = lo + ((hi - lo) >> 1);
+        if (cmp_zh(mid, key, klen) < 0) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+}
+
+int dict_zh_find(const char *utf8, int len, int *out, int maxn) {
+    if (!g_zh || !g_nzh || len <= 0 || maxn <= 0) return 0;
+    int lo = 0, hi = (int)g_nzh - 1;
+    while (lo <= hi) {
+        int mid = lo + ((hi - lo) >> 1);
+        int c = cmp_zh(mid, utf8, len);
+        if (c == 0) {
+            const RawZh *z = &g_zh[mid];
+            int n = (int)z->cnt;
+            if (n > maxn) n = maxn;
+            /* postings 在导出时已按 星级 -> 词频 排好 */
+            for (int i = 0; i < n; i++)
+                out[i] = (int)g_zhpost[z->poff + (uint32_t)i];
+            return n;
+        }
+        if (c < 0) lo = mid + 1; else hi = mid - 1;
+    }
+    return 0;
+}
+
+int dict_zh_prefix(const char *utf8, int len, int *out, int maxn) {
+    if (!g_zh || !g_nzh || len <= 0 || maxn <= 0) return 0;
+    int i = zh_lower_bound(utf8, len);
+    int m = 0;
+    for (; i < (int)g_nzh && m < maxn; i++) {
+        const RawZh *z = &g_zh[i];
+        if ((int)z->len < len) break;
+        if (memcmp(g_str + z->off, utf8, (size_t)len) != 0) break;
+        for (uint32_t k = 0; k < z->cnt && m < maxn; k++) {
+            int idx = (int)g_zhpost[z->poff + k];
+            int dup = 0;
+            for (int j = 0; j < m; j++) if (out[j] == idx) { dup = 1; break; }
+            if (!dup) out[m++] = idx;
+        }
+    }
+    return m;
+}
+
+int dict_zh_norm(const char *in, int len, char *out, int cap) {
+    static const char *suf[4] = { "\xE7\x9A\x84", "\xE5\x9C\xB0",
+                                  "\xE5\xBE\x97", "\xE4\xBA\x86" };  /* 的地得了 */
+    int st = 0, en = len;
+    while (st < en && (unsigned char)in[st] <= ' ') st++;
+    while (en > st && (unsigned char)in[en - 1] <= ' ') en--;
+    for (;;) {
+        int cut = 0;
+        if (en - st >= 6) {                 /* 至少留一个字 */
+            for (int i = 0; i < 4; i++) {
+                if (memcmp(in + en - 3, suf[i], 3) == 0) { en -= 3; cut = 1; break; }
+            }
+        }
+        if (!cut) break;
+    }
+    int n = en - st;
+    if (n > cap - 1) n = cap - 1;
+    memcpy(out, in + st, (size_t)n);
+    out[n] = 0;
+    return n;
+}
+
+static int freq_bucket(uint32_t frq) {    if (frq == 0) return 4;
     if (frq <= 5000) return 0;
     if (frq <= 15000) return 1;
     if (frq <= 40000) return 2;

@@ -3,23 +3,24 @@
 [![build](https://github.com/Philohuare/LiteDict/actions/workflows/build.yml/badge.svg)](https://github.com/Philohuare/LiteDict/actions/workflows/build.yml)
 [![release](https://img.shields.io/github/v/release/Philohuare/LiteDict?label=release)](https://github.com/Philohuare/LiteDict/releases/latest)
 
-用 C 和 Win32 API 写的本地英汉词典。**单文件 exe，无 Python、无浏览器、无任何运行时依赖**，
-双击即用。界面全部 GDI 自绘，跟随系统深浅色。
+用 C 和 Win32 API 写的本地词典。**单文件 exe，无 Python、无浏览器、无任何运行时依赖**，
+双击即用，**英译汉、汉译英都行**。界面全部 GDI 自绘，跟随系统深浅色。
 
 > ### 只想用，不想编译
 >
 > | 想做的事 | 下载 |
 > |---|---|
-> | 直接用（exe + 77 万词条词库） | [**LiteDict-v1.0.0-win64.zip**](https://github.com/Philohuare/LiteDict/releases/latest/download/LiteDict-v1.0.0-win64.zip) · 84 MB |
+> | 直接用（exe + 77 万词条词库） | [**LiteDict-v1.0.1-win64.zip**](https://github.com/Philohuare/LiteDict/releases/latest/download/LiteDict-v1.0.1-win64.zip) · 105 MB |
 > | 只更新程序（配已有词库） | [LiteDict.exe](https://github.com/Philohuare/LiteDict/releases/latest/download/LiteDict.exe) · 220 KB |
-> | 只要词库 | [dict.ldict](https://github.com/Philohuare/LiteDict/releases/latest/download/dict.ldict) · 84 MB |
+> | 只要词库 | [dict.ldict](https://github.com/Philohuare/LiteDict/releases/latest/download/dict.ldict) · 105 MB |
 >
 > 第一种解压后双击 `LiteDict.exe` 即可 —— 绿色版，不装 VS、不联网，删文件夹即卸载。
 > 第二种记得把 `dict.ldict` 放进 exe 同级的 `data\` 目录。
 
 <p align="center">
-  <img src="docs/screenshot-entry.png" width="340" alt="查词结果：词头、音标、柯林斯星级、词性分组">
-  <img src="docs/screenshot-menu.png" width="340" alt="右键面板：清空最近查询 / 置顶开关 / 不透明度滑块">
+  <img src="docs/screenshot-entry.png" width="270" alt="英译汉：词头、音标、柯林斯星级、词性分组">
+  <img src="docs/screenshot-zh.png" width="270" alt="汉译英：输入中文，列出候选英文词">
+  <img src="docs/screenshot-menu.png" width="270" alt="右键面板：清空最近查询 / 置顶开关 / 不透明度滑块">
 </p>
 
 ---
@@ -28,12 +29,12 @@
 
 ```
 LiteDict.exe          ← 双击这个
-data/dict.ldict       ← 词典数据（77 万词条，84 MB）
+data/dict.ldict       ← 词典数据（77 万词条，105 MB）
 ```
 
 两者放在一起即可，可以整体拷到任意目录或 U 盘。
 
-> **仓库里只放源码**：`LiteDict.exe`（220 KB）和 `data/dict.ldict`（84 MB）不打进 Git，
+> **仓库里只放源码**：`LiteDict.exe`（220 KB）和 `data/dict.ldict`（105 MB）不打进 Git，
 > 前者每次 CI 都会构建，成品在 [Releases](https://github.com/Philohuare/LiteDict/releases/latest)；
 > 后者按下面「词库格式 → 要重建」一节用 `tools/export_ldict.py` 生成。
 
@@ -85,7 +86,8 @@ data/dict.ldict       ← 词典数据（77 万词条，84 MB）
 
 | 按键 | 作用 |
 |---|---|
-| 直接输入 | 实时联想（`↑` `↓` 选择） |
+| 直接输入英文 | 实时联想（`↑` `↓` 选择） |
+| 直接输入中文 | 汉译英：列出候选英文词，点击进入词条 |
 | `Enter` | 查询 / 确认选中的联想词 |
 | `Esc` | 清空并回到首页 |
 | `F1` | 聚焦搜索框（已有内容时全选）；在别的程序里按则全局呼出 |
@@ -97,6 +99,8 @@ data/dict.ldict       ← 词典数据（77 万词条，84 MB）
 ## 功能
 
 - **离线查词**：77 万词条，中英释义、音标、柯林斯星级、考试标签（中考/高考/CET4/CET6/考研/托福/雅思/GRE）
+- **汉译英**：输入中文（如「学习」「放弃」），按常用度列出候选英文词，点一下进词条页；
+  覆盖 64 万个中文词，索引离线构建，查询同样是二分，零等待
 - **词形还原**：`went` 显示原形提示并可点击跳转，`studied` 这类既有过去式又有过去分词的形式自动合并标签
 - **智能联想**：按词频分档 + 词长排序，输入 `stud` 第一个是 `study`
 - **拼写纠错**：未收录时给相近词
@@ -135,10 +139,13 @@ tools/
 ```
 
 - 条目按小写词字节序排列，变体按变体字节序排列 → C 侧直接二分，无需建索引
+- 第 4 段是**中文反向索引**（版本 2 起）：`[uint32 n][dir n×16B][postings uint32…]`，
+  term 串复用字符串池，postings 在导出时已按「常用度 → 义项次序」排好，
+  所以汉译英也是一次二分 + 顺序读，不做任何运行时计算
 - UTF-8 存储，显示时才转 UTF-16
 - 整文件 `CreateFileMapping` 映射，启动不读盘，内存占用只算用到的页
 
-想直接用现成的词库（84 MB，不必自己从 ECDICT 生成）：
+想直接用现成的词库（105 MB，不必自己从 ECDICT 生成）：
 
 ```powershell
 mkdir data -Force | Out-Null

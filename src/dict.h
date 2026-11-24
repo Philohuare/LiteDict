@@ -27,6 +27,20 @@ int dict_find(const char *wl, int len);
 /* 变形 -> 词条索引，找不到返回 -1 */
 int dict_var_base(const char *wl, int len);
 
+/* ---- 汉译英：中文释义反向索引（版本 2 词库才有，旧库返回 0） ---- */
+
+/* 索引里的中文词条数 */
+int dict_zh_count(void);
+
+/* 中文词精确查：out 里是词条索引，已按 柯林斯星级 -> 词频 排好序 */
+int dict_zh_find(const char *utf8, int len, int *out, int maxn);
+
+/* 中文词前缀查（用于"相近词"兜底） */
+int dict_zh_prefix(const char *utf8, int len, int *out, int maxn);
+
+/* 中文查询归一化：剪首尾空白、去掉结尾的 的/地/得/了，与导出脚本规则一致 */
+int dict_zh_norm(const char *in, int len, char *out, int cap);
+
 /* 前缀匹配，返回写入 out 的条数 */
 /* by_freq=1 时按 常用度分档 + 词长 排序 */
 int dict_prefix(const char *pre, int len, int *out, int maxn, int by_freq);

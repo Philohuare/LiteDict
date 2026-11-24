@@ -53,7 +53,7 @@ static void theme_init(void) {
 #define NSUG 12
 #define MAXHOT 220
 
-enum { MODE_HOME, MODE_ENTRY, MODE_MISS, MODE_FAV };
+enum { MODE_HOME, MODE_ENTRY, MODE_MISS, MODE_FAV, MODE_ZH };
 
 typedef struct { RECT rc; wchar_t word[80]; int kind; } Hot;
 
@@ -87,6 +87,13 @@ static wchar_t W_rel[8][64];
 static int g_sug[NSUG]; static int g_nsug;
 static wchar_t W_sug[NSUG][64], W_sug_tr[NSUG][120], W_sug_ph[NSUG][64];
 static int g_sel = -1;
+
+/* 汉译英：中文查询命中的词条 */
+static int g_zhres[48];
+static int g_nzres;
+static int g_zhApprox;
+static int g_missZh;
+static wchar_t W_zhq[64];
 
 static Hot g_hot[MAXHOT]; static int g_nhot;
 
@@ -426,6 +433,49 @@ static void load_entry(int idx) {
     W_lemma[0] = 0;
 }
 
+/* --------------------------------------------------------------- 汉译英 */
+
+/* UTF-8 里中文（含全角标点）是三字节、首字节 >= 0xE3 */
+static int has_cjk(const char *s) {
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++)
+        if (*p >= 0xE3) return 1;
+    return 0;
+}
+
+static void zh_lookup(const char *raw) {
+    char key[256];
+    int kn = dict_zh_norm(raw, (int)strlen(raw), key, sizeof(key));
+    if (kn <= 0) { g_mode = MODE_HOME; return; }
+
+    lstrcpynA(g_query, raw, 128);
+    utf8_to_w(key, W_zhq, 64);
+
+    int n = dict_zh_find(key, kn, g_zhres, 48);
+    g_zhApprox = 0;
+    if (n <= 0) {                    /* 精确没命中就给前缀，别一上来判死 */
+        n = dict_zh_prefix(key, kn, g_zhres, 48);
+        g_zhApprox = n > 0;
+    }
+    g_nzres = n;
+    g_idx = -1;
+    g_lemma = -1;
+    g_nsug = 0;
+    g_sel = -1;
+    g_scroll = 0;
+
+    if (n > 0) {
+        g_mode = MODE_ZH;
+        g_missZh = 0;
+        store_hist_add(raw);
+        return;
+    }
+
+    g_mode = MODE_MISS;
+    g_missZh = 1;
+    g_nrel = 0;
+    utf8_to_w(key, W_word, 128);
+}
+
 static void do_lookup(const char *raw) {
     /* 先剪掉首尾空白：历史里可能带 \r、粘贴可能带空格，
      * 带着这些字符去查一定查不到，而界面上看又完全一样 */
@@ -441,6 +491,8 @@ static void do_lookup(const char *raw) {
         raw = trimmed;
     }
     if (!raw[0]) { g_mode = MODE_HOME; return; }
+    if (has_cjk(raw)) { zh_lookup(raw); return; }
+    g_missZh = 0;
 
     char low[256];
     int n = dict_lower(raw, (int)strlen(raw), low, sizeof(low));
@@ -491,7 +543,7 @@ static void update_suggest(void) {
     char q[512];
     WideCharToMultiByte(CP_UTF8, 0, wq, -1, q, sizeof(q), NULL, NULL);
     int len = (int)strlen(q);
-    if (len <= 0) { g_nsug = 0; g_sel = -1; return; }
+    if (len <= 0 || has_cjk(q)) { g_nsug = 0; g_sel = -1; return; }
     g_nsug = dict_prefix(q, len, g_sug, NSUG, 1);
     /* 按窗口可用高度裁剪，避免小窗下列表溢出 */
     {
@@ -808,13 +860,56 @@ static int Render(HDC dc, int clientW, int top, int scroll, int dry) {
                 y += Px(10);
             }
         }
+    } else if (g_mode == MODE_ZH) {
+        /* 汉译英：大字中文词 + 候选英文词列表 */
+        Txt(dc, W_zhq, x, y, w, g_fHw2, T.text, DT_SINGLELINE, dry);
+        y += Px(48);
+
+        wchar_t sub[96];
+        if (g_zhApprox)
+            _snwprintf_s(sub, 96, _TRUNCATE, L"没有完全对应的词 · 相关说法 %d 个",
+                         g_nzres);
+        else
+            _snwprintf_s(sub, 96, _TRUNCATE, L"汉译英 · %d 个词，按常用度排序",
+                         g_nzres);
+        y += Txt(dc, sub, x, y, w, g_fTag, T.dim2, DT_SINGLELINE, dry);
+        y += Px(14);
+        if (!dry) HLine(dc, x, x + w, y, T.line);
+        y += Px(12);
+
+        for (int i = 0; i < g_nzres; i++) {
+            const DictEntry *e = dict_entry(g_zhres[i]);
+            wchar_t ww[96], ph[96], tr[220];
+            utf8_to_w(e->word, ww, 96);
+            utf8_to_w(e->phonetic, ph, 96);
+            utf8_to_w(e->translation, tr, 220);
+            wchar_t *nl = wcschr(tr, L'\n');
+            if (nl) *nl = 0;
+
+            RECT rb = { x, y, x + w, y + Px(46) };
+            if (!dry) {
+                FillRound(dc, rb, Px(10), T.panel, T.line);
+                Txt(dc, ww, x + Px(14), y + Px(7), w - Px(170), g_fSmallB,
+                    T.text, DT_SINGLELINE | DT_END_ELLIPSIS, 0);
+                if (ph[0])
+                    Txt(dc, ph, x + Px(14), y + Px(26), w - Px(170), g_fTag,
+                        T.dim2, DT_SINGLELINE | DT_END_ELLIPSIS, 0);
+                Txt(dc, tr, x + w - Px(196), y + Px(14), Px(182), g_fSmall,
+                    T.dim, DT_SINGLELINE | DT_RIGHT | DT_END_ELLIPSIS, 0);
+            }
+            AddHot(rb, ww, 0, dry);
+            y += Px(52);
+        }
+        y += Px(8);
     } else if (g_mode == MODE_MISS) {
         Txt(dc, W_word, x, y, w, g_fHw, T.text, DT_SINGLELINE, dry);
         y += Px(56);
-        y += Txt(dc, L"未收录该词", x, y, w, g_fBody, T.dim, DT_SINGLELINE, dry);
+        y += Txt(dc, g_missZh ? L"没有收录这个中文词" : L"未收录该词",
+                 x, y, w, g_fBody, T.dim, DT_SINGLELINE, dry);
         y += Px(8);
-        y += Txt(dc, L"检查拼写后重试，或试试下面的相近词", x, y, w, g_fSmall, T.dim2,
-                 DT_SINGLELINE, dry);
+        y += Txt(dc, g_missZh ? L"换个说法，或直接查英文再看它的中文释义"
+                              : L"检查拼写后重试，或试试下面的相近词",
+                 x, y, w, g_fSmall, T.dim2, DT_SINGLELINE, dry);
         y += Px(26);
         if (g_nrel) {
             Txt(dc, L"你是不是想找", x, y, Px(200), g_fTag, T.dim2, DT_SINGLELINE, dry);
@@ -995,6 +1090,8 @@ static void handle_escape(void) {
     g_sel = -1;
     g_mode = MODE_HOME;
     g_scroll = 0;
+    g_nzres = 0;
+    g_missZh = 0;
     InvalidateRect(g_hwnd, NULL, FALSE);
 }
 
