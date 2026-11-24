@@ -90,6 +90,7 @@ data/dict.ldict       ← 词典数据（77 万词条，84 MB）
 ## 代码结构
 
 ```
+LiteDict.sln / LiteDict.vcxproj / test_dict.vcxproj   VS 工程
 src/
 ├── app.c       主程序：窗口、GDI 自绘、排版、交互、联想
 ├── dict.c      词库层：mmap 映射 + 二分查找
@@ -127,6 +128,24 @@ python tools/export_ldict.py
 
 ## 编译
 
+### 用 Visual Studio 打开（推荐）
+
+双击 `LiteDict.sln`（VS 2022 / 2026 都能直接开；工程用 `v145` 工具集，
+若你装的是 VS2022，在「项目属性 → 常规 → 平台工具集」里改成 `v143` 即可）：
+
+```
+LiteDict.sln
+├── LiteDict    ← 主程序，Windows 子系统，输出 bin\<Config>\LiteDict.exe
+└── test_dict   ← 词库自测，控制台，输出 bin\<Config>\test_dict.exe
+```
+
+- 平台选 `x64`、配置选 `Release`，`Ctrl+Shift+B` 就能出包；`.c` 会按 C 编译，无需改设置
+- 头文件路径（`src`）、`/utf-8`、`UNICODE`、子系统、14 个系统库都已经写进工程
+- 本地若已有 `data/dict.ldict`，构建后会自动拷到 `bin\<Config>\data\`，按 F5 直接能查词
+- 图标 `res/app.rc` 挂在「资源文件」下，换图标只需替换 `res/app.ico`
+
+### 命令行（不开 IDE）
+
 需要 Visual Studio 的 C++ 工具链（MSVC + Windows SDK）。
 
 ```bat
@@ -135,6 +154,12 @@ build.bat litedict
 
 脚本里手动指定了 MSVC 与 SDK 的 include/lib 路径，因为 `vcvars64.bat` 会调用
 `reg.exe`，在某些受限环境下会被安全策略拦截。
+
+也可以直接构建解决方案（x64 原生工具）：
+
+```bat
+msbuild LiteDict.sln /p:Configuration=Release /p:Platform=x64
+```
 
 产物 `LiteDict.exe` 约 220 KB，链接：user32 / gdi32 / winhttp / winmm / sapi / dwmapi / imm32 / msimg32。
 

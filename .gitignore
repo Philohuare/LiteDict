@@ -9,5 +9,12 @@
 data/*.ldict
 data/user.txt
 
+# VS 构建目录与用户文件
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
 # 调试截图
 *.bmp
