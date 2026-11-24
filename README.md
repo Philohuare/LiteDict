@@ -17,6 +17,11 @@
 > 第一种解压后双击 `LiteDict.exe` 即可 —— 绿色版，不装 VS、不联网，删文件夹即卸载。
 > 第二种记得把 `dict.ldict` 放进 exe 同级的 `data\` 目录。
 
+<p align="center">
+  <img src="docs/screenshot-entry.png" width="340" alt="查词结果：词头、音标、柯林斯星级、词性分组">
+  <img src="docs/screenshot-menu.png" width="340" alt="右键面板：清空最近查询 / 置顶开关 / 不透明度滑块">
+</p>
+
 ---
 
 ## 直接使用
