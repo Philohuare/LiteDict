@@ -1,0 +1,13 @@
+# 构建产物
+*.obj
+*.exe
+*.res
+*.pdb
+*.ilk
+
+# 词库与个人使用记录（用 tools/export_ldict.py 自行生成）
+data/*.ldict
+data/user.txt
+
+# 调试截图
+*.bmp
