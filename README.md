@@ -1,7 +1,15 @@
 # LiteDict · 纯 C 词典（Windows 原生）
 
+[![build](https://github.com/Philohuare/LiteDict/actions/workflows/build.yml/badge.svg)](https://github.com/Philohuare/LiteDict/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/Philohuare/LiteDict?label=release)](https://github.com/Philohuare/LiteDict/releases/latest)
+
 用 C 和 Win32 API 写的本地英汉词典。**单文件 exe，无 Python、无浏览器、无任何运行时依赖**，
 双击即用。界面全部 GDI 自绘，跟随系统深浅色。
+
+> ### 只想用，不想编译
+> 到 [**Releases**](https://github.com/Philohuare/LiteDict/releases/latest) 下载
+> `LiteDict-*-win64.zip`，解压后双击 `LiteDict.exe` 就行 —— exe 和 77 万词条的词库都在包里，
+> 不用装 VS，不用联网。绿色版，删文件夹即卸载。
 
 ---
 
@@ -14,8 +22,9 @@ data/dict.ldict       ← 词典数据（77 万词条，84 MB）
 
 两者放在一起即可，可以整体拷到任意目录或 U 盘。
 
-> **仓库里没有 `LiteDict.exe` 和 `data/dict.ldict`**（词库 84 MB，二进制不入库）。
-> 拿到源码后按下面两节「词库格式 → 要重建」「编译」自己生成，两条命令的事。
+> **仓库里只放源码**：`LiteDict.exe`（220 KB）和 `data/dict.ldict`（84 MB）不打进 Git，
+> 前者每次 CI 都会构建，成品在 [Releases](https://github.com/Philohuare/LiteDict/releases/latest)；
+> 后者按下面「词库格式 → 要重建」一节用 `tools/export_ldict.py` 生成。
 
 启动后是一个 **416×390 的小窗，停在屏幕右上角**，适合一边看资料一边查词。
 滚动条只在内容超出时才出现，首页这种短内容不会挂一条灰边。

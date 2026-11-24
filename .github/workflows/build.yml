@@ -1,0 +1,62 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 工程里按 $(VisualStudioVersion) 自动选工具集：
+      # runner 上是 VS2022 → v143；将来换 VS2026 → v145
+      - name: 编译（Release x64）
+        run: msbuild LiteDict.sln /m /p:Configuration=Release /p:Platform=x64 /v:m
+
+      - name: 跑词库自测
+        run: |
+          if (Test-Path data/dict.ldict) {
+            ./bin/Release/test_dict.exe
+          } else {
+            Write-Host "仓库里没有词库，跳过 test_dict"
+          }
+        shell: pwsh
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiteDict-win64
+          path: bin/Release/LiteDict.exe
+          if-no-files-found: error
+
+  release:
+    needs: windows-x64
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: LiteDict-win64
+          path: dist
+
+      - name: 发布到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/LiteDict.exe
+          body: |
+            下载 `LiteDict.exe`，与词典数据 `data/dict.ldict` 放在同一目录即可运行。
+
+            词库（84 MB）不随仓库分发，见 README 的「词库格式 → 要重建」。
