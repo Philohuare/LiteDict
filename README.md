@@ -133,7 +133,14 @@ tools/
 - UTF-8 存储，显示时才转 UTF-16
 - 整文件 `CreateFileMapping` 映射，启动不读盘，内存占用只算用到的页
 
-要重建：
+想直接用现成的词库（84 MB，不必自己从 ECDICT 生成）：
+
+```powershell
+mkdir data -Force | Out-Null
+curl.exe -L -o data/dict.ldict https://github.com/Philohuare/LiteDict/releases/latest/download/dict.ldict
+```
+
+想完全自己生成（ECDICT → SQLite → .ldict）：
 
 ```bash
 # 1. 下载 ECDICT 的 ecdict.csv 放入任意位置
